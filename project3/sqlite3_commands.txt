@@ -1,0 +1,12 @@
+sqlite3 .\project3.db
+.schema
+insert into todos (title, description, prioriy, complete) values ('store', 'eggs', 1, 0);  
+
+select * from todos;
+.mode column
+.mode markdown
+.mode box
+.mode table
+delete from todos where id = 1;
+
+# It reuses deleted PK
