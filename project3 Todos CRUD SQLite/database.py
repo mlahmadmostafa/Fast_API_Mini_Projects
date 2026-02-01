@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-SQLALCHEMY_DATABASE_URI = 'sqlite:///project3.db' # Database is local inside the project3 folder
+SQLALCHEMY_DATABASE_URI = 'sqlite:///project3_app.db' # Database is local inside the project3 folder
 
 
 

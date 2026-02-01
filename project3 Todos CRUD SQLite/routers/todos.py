@@ -1,15 +1,14 @@
+from fastapi import APIRouter
+
+
 from typing import Annotated
-from fastapi import FastAPI, Depends, HTTPException, Path
-import models
+from fastapi import Depends, HTTPException, Path
 from models import Todos
-from database import engine, SessionLocal
+from database import SessionLocal
 from sqlalchemy.orm import Session
 from starlette import status
 from pydantic import BaseModel, Field
-app = FastAPI()
-
-# this craetes the database (or uses existing) on run
-models.Base.metadata.create_all(bind = engine) 
+router = APIRouter()
 
 
 # makes fastapi quicker as it fetches data then closes connection
@@ -31,11 +30,11 @@ class TodoRequest(BaseModel):
 
 # Dependency injection we need to do something before executing what we need
 # this function relies on our db opening up returning the result and then closes afterwards
-@app.get("/", status_code=status.HTTP_200_OK)
+@router.get("/", status_code=status.HTTP_200_OK)
 async def read_all(db: db_dependency):
     return db.query(Todos).all()
 # no matter the outcome, status is 200 if no error happens
-@app.get("/todo/{todo_id}", status_code=status.HTTP_200_OK)
+@router.get("/todo/{todo_id}", status_code=status.HTTP_200_OK)
 def read_todo(db: db_dependency, todo_id: int = Path(gt=0)):
     # ID have one match as it is a primary key
     todo_model = db.query(Todos).filter(Todos.id == todo_id).first()
@@ -44,7 +43,7 @@ def read_todo(db: db_dependency, todo_id: int = Path(gt=0)):
     raise HTTPException(status_code=404,detail="Not Found")
 
 
-@app.post('/todo', status_code=status.HTTP_201_CREATED)
+@router.post('/todo', status_code=status.HTTP_201_CREATED)
 async def create_todo(db: db_dependency, todo_request: TodoRequest):
     todo_model = Todos(**todo_request.model_dump())
     
@@ -52,7 +51,7 @@ async def create_todo(db: db_dependency, todo_request: TodoRequest):
     db.commit()
     
 # Update request method
-@app.put("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.put("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def update_todo(
     db: db_dependency,
     todo_request: TodoRequest,
@@ -73,4 +72,13 @@ async def update_todo(
     # so it is either error or dupe
     
     db.add(todo_model)
+    db.commit()
+
+# All endpoints need to start with /
+@router.delete("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_todo(db: db_dependency, todo_id: int = Path(gt=0)):
+    todo_model = db.query(Todos).filter(Todos.id == todo_id).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404, detail="Todo not found.")
+    db.query(Todos).filter(Todos.id == todo_id).delete()
     db.commit()
