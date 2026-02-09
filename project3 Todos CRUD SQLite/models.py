@@ -14,7 +14,7 @@ class Users(Base):
         String,
         unique=True
     )
-    user = Column(
+    username = Column(
         String,
         unique=True
     )
