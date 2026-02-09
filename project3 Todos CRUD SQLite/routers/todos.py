@@ -8,7 +8,8 @@ from database import SessionLocal
 from sqlalchemy.orm import Session
 from starlette import status
 from pydantic import BaseModel, Field
-router = APIRouter()
+from .auth import get_current_user
+router = APIRouter(prefix="/todos", tags=["todos"])
 
 
 # makes fastapi quicker as it fetches data then closes connection
@@ -20,6 +21,7 @@ def get_db():
         db.close()
 
 db_dependency = Annotated[Session, Depends(get_db)]
+user_dependency = Annotated[dict, Depends(get_current_user)]
 
 # Field is for checkers
 class TodoRequest(BaseModel):
@@ -31,8 +33,9 @@ class TodoRequest(BaseModel):
 # Dependency injection we need to do something before executing what we need
 # this function relies on our db opening up returning the result and then closes afterwards
 @router.get("/", status_code=status.HTTP_200_OK)
-async def read_all(db: db_dependency):
-    return db.query(Todos).all()
+async def read_all(db: db_dependency, user: user_dependency):
+    return db.query(Todos).filter(Todos.owner_id == user.get("user_id")).all()
+
 # no matter the outcome, status is 200 if no error happens
 @router.get("/todo/{todo_id}", status_code=status.HTTP_200_OK)
 def read_todo(db: db_dependency, todo_id: int = Path(gt=0)):
@@ -44,8 +47,10 @@ def read_todo(db: db_dependency, todo_id: int = Path(gt=0)):
 
 
 @router.post('/todo', status_code=status.HTTP_201_CREATED)
-async def create_todo(db: db_dependency, todo_request: TodoRequest):
-    todo_model = Todos(**todo_request.model_dump())
+async def create_todo(db: db_dependency, todo_request: TodoRequest, user: user_dependency):
+    if user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    todo_model = Todos(**todo_request.model_dump(), owner_id=user.get("user_id"))
     
     db.add(todo_model)
     db.commit()
