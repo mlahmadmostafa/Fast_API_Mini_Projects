@@ -31,10 +31,11 @@ def authenticate_user(username: str, password: str, db):
     return user
 
 
-def create_access_token(username: str, user_id: int, expires_delta: timedelta):
+def create_access_token(username: str, user_id: int, role: str, expires_delta: timedelta):
     encode = {
         "sub": username,
         "id": user_id,
+        "role": role,
         "exp": datetime.now(timezone.utc) + expires_delta
     }
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -42,16 +43,19 @@ def create_access_token(username: str, user_id: int, expires_delta: timedelta):
 bcrypt_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token") # Checks if user is authenticated on each call
 db_dependency = Annotated[Session, Depends(get_db)]
+
 async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         user_id: int = payload.get("id")
-        if username is None or user_id is None:
+        role: str = payload.get("role")
+        if username is None or user_id is None or role is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
-        return {"username": username, "user_id": user_id}
+        return {"username": username, "user_id": user_id, "role": role}
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
+
 class CreateUserRequest(BaseModel):
     username:str
     email:str
@@ -61,11 +65,10 @@ class CreateUserRequest(BaseModel):
     role:str
     # ID is auto created
     # Every user is active by default
+
 class Token(BaseModel):
     access_token: str
     token_type: str
-
-
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_user(db: db_dependency, create_user_request: CreateUserRequest):
@@ -97,7 +100,7 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
             detail="Incorrect username or password",
             )
     access_token_expires = timedelta(minutes=20)
-    access_token = create_access_token(user.username, user.id, access_token_expires)
+    access_token = create_access_token(user.username, user.id, user.role, access_token_expires)
     return {
         "access_token": access_token,
         "token_type": "bearer"
