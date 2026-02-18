@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, Depends, Request
 from pydantic import BaseModel
 from typing import Annotated
 from models import Users
@@ -9,6 +9,7 @@ from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
+from fastapi.templating import Jinja2Templates
 MAX_PASSWORD_LENGTH = 64
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -43,7 +44,15 @@ def create_access_token(username: str, user_id: int, role: str, expires_delta: t
 bcrypt_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token") # Checks if user is authenticated on each call
 db_dependency = Annotated[Session, Depends(get_db)]
-
+templates = Jinja2Templates(directory="templates")
+### Pagees ###
+@router.get("/login-page")
+def render_login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+@router.get("/register-page")
+def render_register_page(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request})
+### Endpoints ###
 async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
